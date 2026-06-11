@@ -4,6 +4,8 @@
 #include <sys/mman.h>
 #include <elf.h>
 
+int startup(int argc, char **argv, void (*start)());
+
 int foreach_phdr(void *map_start, void (*func)(Elf32_Phdr *, int), int arg) {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *) map_start;
     Elf32_Phdr *phdr = (Elf32_Phdr *)((char *) map_start + ehdr->e_phoff);
@@ -115,8 +117,7 @@ int main(int argc, char **argv) {
     foreach_phdr(map_start, load_phdr, fd);
 
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *) map_start;
-    void (*entry_point)(void) = (void (*)(void)) ehdr->e_entry;
-    entry_point();
+    startup(argc - 1, argv + 1, (void *)(ehdr->e_entry));
 
     munmap(map_start, size);
     return 0;

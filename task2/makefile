@@ -1,13 +1,13 @@
-all: loader
+all: my_loader
 
-loader: loader.o start.o
-	ld -o loader loader.o start.o -L/usr/lib32 -lc -T linking_script -dynamic-linker /lib32/ld-linux.so.2
+my_loader: my_loader.o start.o startup.o
+	ld -o my_loader my_loader.o start.o startup.o -L/usr/lib32 -lc -T linking_script -dynamic-linker /lib32/ld-linux.so.2
 
-loader.o: loader.c
-	gcc -m32 -c loader.c -o loader.o
+my_loader.o: my_loader.c
+	gcc -m32 -c my_loader.c -o my_loader.o
 
 start.o: start.s
 	nasm -f elf32 start.s -o start.o
 
 clean:
-	rm -f loader loader.o start.o
+	rm -f my_loader my_loader.o start.o
