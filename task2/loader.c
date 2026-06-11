@@ -114,6 +114,10 @@ int main(int argc, char **argv) {
     printf("\nLoading segments:\n");
     foreach_phdr(map_start, load_phdr, fd);
 
+    Elf32_Ehdr *ehdr = (Elf32_Ehdr *) map_start;
+    void (*entry_point)(void) = (void (*)(void)) ehdr->e_entry;
+    entry_point();
+
     munmap(map_start, size);
     return 0;
 }
