@@ -9,7 +9,7 @@ int foreach_phdr(void *map_start, void (*func)(Elf32_Phdr *, int), int arg) {
     Elf32_Phdr *phdr = (Elf32_Phdr *)((char *) map_start + ehdr->e_phoff);
     int i;
     for (i = 0; i < ehdr->e_phnum; i++) {
-        func(phdr, i);
+        func(phdr, arg);
         phdr = (Elf32_Phdr *)((char *) phdr + ehdr->e_phentsize);
     }
     return 0;
@@ -52,6 +52,36 @@ void print_phdr_info(Elf32_Phdr *phdr, int i) {
     }
 }
 
+void load_phdr(Elf32_Phdr *phdr, int fd) {
+    if (phdr->p_type != PT_LOAD)
+        return;
+
+    print_phdr_info(phdr, 0);
+
+    int prot = 0;
+    if (phdr->p_flags & PF_R) prot |= PROT_READ;
+    if (phdr->p_flags & PF_W) prot |= PROT_WRITE;
+    if (phdr->p_flags & PF_X) prot |= PROT_EXEC;
+
+    int page_size = 4096;
+    Elf32_Addr vaddr_aligned  = phdr->p_vaddr & ~(page_size - 1);
+    Elf32_Off  offset_in_page = phdr->p_vaddr &  (page_size - 1);
+    Elf32_Off  offset_aligned = phdr->p_offset - offset_in_page;
+    Elf32_Word map_length     = phdr->p_filesz + offset_in_page;
+
+    void *mapped = mmap(
+        (void *) vaddr_aligned,
+        map_length,
+        prot,
+        MAP_PRIVATE | MAP_FIXED,
+        fd,
+        offset_aligned
+    );
+
+    if (mapped == MAP_FAILED)
+        perror("mmap load_phdr");
+}
+
 int main(int argc, char **argv) {
     int fd;
     int size;
@@ -63,25 +93,27 @@ int main(int argc, char **argv) {
     }
 
     fd = open(argv[1], O_RDONLY);
-    if (fd < 0) { 
-        perror("open"); 
-        return 1; 
+    if (fd < 0) {
+        perror("open");
+        return 1;
     }
 
     size = lseek(fd, 0, SEEK_END);
     lseek(fd, 0, SEEK_SET);
 
     map_start = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (map_start == MAP_FAILED) { 
-        perror("mmap"); 
-        close(fd); 
-        return 1; 
+    if (map_start == MAP_FAILED) {
+        perror("mmap");
+        close(fd);
+        return 1;
     }
-    
+
     printf("%-15s Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align\n", "Type");
     foreach_phdr(map_start, print_phdr_info, 0);
 
+    printf("\nLoading segments:\n");
+    foreach_phdr(map_start, load_phdr, fd);
+
     munmap(map_start, size);
-    close(fd);
     return 0;
 }
